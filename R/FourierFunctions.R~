@@ -1,0 +1,314 @@
+# Auxiliary functions used in processing O2-data
+# 2013-05-22 extended functionality of detrend(). 
+# 2013-07-30 added plotF from project artikel-fourier/R/functions/FourierFunctions.R
+# 2014-12-12 added High level functions WindowGPPFourier.gts and WindowGPPFourier
+
+
+
+#' Calculate GPP from O2 time series with gaps, in consecutive time-windows of prescribed
+#' length
+#' 
+#' Calculate GPP from O2 time series in consecutive time-windows of prescribed
+#' length. High level function to handle time series with gaps. Short gaps are
+#' interpolated, series is split at large gaps. 
+#' 
+#' 
+#' @param x Dataframe containing time (POSIXt) in first column and O2 concentrations in the second column. 
+#' @param dt Sampling time step. Either a difftime object or a numerical value. 
+#' When \code{dt} is given as a numerical value, \code{units} have to be provided (defaults to \code{days}). When omitted \code{dt} is calculated from the time spacing between the first two samples in the data frame.
+#' @param units Unit of sampling time step
+#' @param gapMaxN Minimum number of missing data points to be considered a gap in the time series. Gaps smaller than gapMaxN are interpolated. Defaults to the number of samples corresponding to a 4 hour gap.
+#' @param Width Width [days] of the time-windows for which GPP is calculated
+#' @param filtWidth Length of moving average filter [hours] to filter O2
+#' @param ... Other parameters to be passed to WindowGPPFourier()
+#' @return Average gross primary production in units of oxgen as in \code{x}
+#' per day.
+#' @details This high level function analyses multiple regular O2 time series at once, each separated by a gap larger than gapMaxN (the number of . This is convenient e.g. for regular O2 data from a single location, where some data is missing due to sensor maintenance or replacement. \code{x} is assumed to contain all these data, pasted together in a single data frame (e.g. by \code{\link{cbind}}ing all individual regular time series or just reading from a single data file). Additionally, missing values within the regular series are allowed and are interpolated with \code{\link{gapfill}}. Uses \code{\link{WindowGPPFourier}}.
+#' @seealso \code{\link{GPPFourierPreprocess}}, \code{\link{SunRiseSet}},
+#' \code{\link{WindowGPPFourier}}
+#' @keywords utilities
+#' @references Cox T.J.S. et al. (2015) 'Estimating primary production from oxygen time series: a novel approach in the frequency domain', Limnology And Oceanography:Methods 13, 529-552. DOI: 10.1002/lom3.10046
+#' @examples 
+#' GPPAll <- WindowGPPFourier.gts(O2_2010, gapMaxN = 10, Width = 10, filtWidth=24, phi=51.176,lambda=4.326, Detrend=TRUE) 
+#' 
+#' 
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @export WindowGPPFourier.gts
+WindowGPPFourier.gts <- function(x, 
+				dt = difftime(x[2,1],x[1,1],units="days"),
+				units = c("days", "hours", "mins"),
+				gapMaxN = 4/24/dt, 
+				Width = 14, 
+				filtWidth=16,
+				 
+				...) {
+
+# x: data frame with first column t, and second column O2
+# gapMaxN: number of missing samples that will be interpolated. More than gapMaxN missing samples will be handled as a gap
+# with dt = 10 min, N = 6 amounts to 1h-gaps being linearly interpolated, 6*4 = 4h gaps interpolated
+
+ts <- x		# internal alias
+ts$O2interpol <- ts[,2]
+
+unit <- match.arg(units)
+ if (!inherits(dt,"difftime")){
+   if (is.null(units)) {
+      stop("Either provide dt as difftime object, or provide units of dt")
+      } else {
+      dt <- as.difftime(dt, units=unit)
+      }
+    }
+
+dt <- as.double(dt, units="days")
+
+
+
+# Remove all gaps > dt*gapMaxN
+gaps2 <- gapsts(ts[,1], dtMax=dt*gapMaxN, unit="days")
+ts$N <- 0
+ts$N[is.element(ts[,1],gaps2$t2)] <- 1
+ts$N <- cumsum(ts$N)
+
+# interpolate all gaps < dt*gapsMaxN
+tslist <- split(ts[,1:2], ts$N)
+tsfilledAll <- lapply(tslist, gapfill)
+tsfilled <- do.call(rbind, tsfilledAll)
+
+# re-add N
+gaps2 <- gapsts(tsfilled[,1], dtMax=dt*gapMaxN, unit="days")
+tsfilled$N <- 0
+tsfilled$N[is.element(tsfilled$t,gaps2$t2)] <- 1
+tsfilled$N <- cumsum(tsfilled$N)
+
+# Windowed GP calculation on 'continuous' subsets of 10d or more, with small gaps filled
+tslist <- split(tsfilled[,c("t","y")], tsfilled$N)
+dtlist <- lapply(tslist, function(x) {x[1,1]- x[2,1]})
+sublengths <- tapply(tsfilled$t, tsfilled$N, length)
+
+tslist <- tslist[sublengths > Width/dt]
+GPAll <- lapply(tslist, WindowGPPFourier, Width=Width, filtWidth=filtWidth, ...)
+
+GPAll <- do.call(rbind, GPAll)
+return(GPAll)
+}
+
+
+
+
+#' Calculate GPP from O2 time series in consecutive time-windows of prescribed
+#' length
+#' 
+#' Calculate GPP from O2 time series in consecutive time-windows of prescribed
+#' length. 
+#' 
+#' @param x Vector or dataframe containing consecutive O2 concentrations, sampled at regular intervals (time step = dt). In case of irregular time intervals, consider \code{\link{resample}}.
+#' When x is a data frame, time (POSIXt) must be in first column and O2 in second column; when x is a vector, dt must be provided. 
+#' @param dt Sampling time step. Either a difftime object or a numerical value. 
+#' When \code{dt} is given as a numerical value, the unit is assumed to be
+#' days, unless \code{units} is provided. Can be omitted when \code{x} is a data frame, then \code{dt} is calculated from the time spacing between the first two samples. 
+#' @param units Unit of sampling time step
+#' @param Width Width [days] of the time-windows for which GPP is calculated
+#' @param Nblocks Number of consecutive subsections on which to calculate GPP. By default the number of windows of Width fitting into the range of x[,1]
+#' Default the largest number of blocks ow width=Width that
+#' @param phi Latitude of location where O2 series was recorded. Used to
+#' calculate relative fraction of light hours during the day, during which
+#' production takes place
+#' @param lambda Longitude of location where O2 series was recorded
+#' @param filtWidth [hours] Lenght of moving average filter to filter O2
+#' series. See GPPFourierPreprocess()
+#' @param ... Other parameters to be passed to GPPFourier()
+#' @return Average gross primary production in units of oxgen as in \code{x}
+#' per day.
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @seealso \code{\link{GPPFourierPreprocess}}, \code{\link{GPPFourier}}, \code{\link{WindowGPPFourier.gts}}, \code{\link{SunRiseSet}}
+#' @keywords utilities
+#' 
+#' @references Cox T.J.S. et al. (2015) 'Estimating primary production from oxygen time series: a novel approach in the frequency domain', Limnology And Oceanography:Methods 13, 529-552. DOI: 10.1002/lom3.10046
+#' 
+#' 
+#' @export WindowGPPFourier
+WindowGPPFourier <- function(x, 	 
+			dt=NULL,
+			units=c("days","hours","mins"),	
+			Width=14, 	
+			Nblocks=floor(unclass(difftime(range(ts[,1])[2], range(ts[,1])[1],units="days"))[1]/Width), 
+			phi, 		
+			lambda, 
+			filtWidth=16, 	
+			...){		
+
+ts <- x	# internal alias
+
+if (inherits(ts,"data.frame")){
+  if (any(is.na(ts[,c(1,2)]))) stop("NAs not allowed")
+  if (dim(ts)[2]>=2){
+	t <- ts[,1]
+	if (any(0!=diff(diff(round(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
+	dt <- difftime(t[2],t[1],units="days")
+     	O2 <- ts[,2]
+  }
+} else {
+  if (is.null(dt)) stop("Provide dt")
+  if (any(is.na(ts))) stop("NAs not allowed")
+  O2 <- ts
+  unit <- match.arg(units)
+    if (!inherits(dt,"difftime")){
+      if (is.null(units)) {
+      stop("Either provide dt as difftime object, or provide units of dt")
+      } else {
+      dt <- as.difftime(dt, units=unit)
+      }
+    }
+  t <- 1:length(O2)*dt
+}
+
+dtnumeric <- as.double(dt, units="days")
+Nfilt <- filtWidth/dtnumeric/24
+
+
+blockst1 <- t[1] + (0:(Nblocks-1))*86400*Width
+blockmids <- t[1] + Width/2*86400 + (0:(Nblocks-1))*86400*Width
+blocknum <- approx(x=blockst1,y=0:(Nblocks-1),xout=t,method="constant", rule=2)$y
+blocklength <- tapply(t, blocknum, length)
+
+# calculate GPP on all consecutive subsets of Width
+GPAll <- NULL
+for (i in unique(blocknum))
+{
+O2i <- O2[blocknum==i]
+ti <- t[blocknum==i]
+if (length(O2i) < 1.5*Nfilt){
+GPAll <- c(GPAll,NA)
+} else {
+RiseSet <- SunRiseSet(ti,phi=phi,lambda=lambda) + 2   #summertime = GMT+2
+DL <- diff(RiseSet)
+
+
+fDL <- DL/24
+GPO2 <- GPPFourier(x=O2i,dt=dt,Nfilt= Nfilt, fDL=fDL, ...) 		# Unit: mmol O2/m3/d
+GPAll <- c(GPAll,GPO2)
+}
+}
+return(data.frame(time=blockmids[unique(blocknum+1)],GPP=GPAll, t1=blockst1[unique(blocknum+1)], t2=blockst1[unique(blocknum+1)] + Width*86400))
+}
+
+#
+# Calculate fft, padded with zeroes and plot result.
+#
+
+
+
+#' Test plot for padded fft calculation
+#' 
+#' Test plot for padded fft calculation
+#' 
+#' 
+#' @param y Vector or time series for which fft and padded fft is calculated
+#' @param padlength Number of zeroes to be appended to \code{y}
+#' @param dt Time interval between succesive values of \code{y}
+#' @param ... Other arguments passed to plot()
+#' @return A two panel plot is generated with the unpadded fft on top and the
+#' padded fft at the bottom
+#' @author Tom Cox <tom.cox@@uantwerp.be>
+#' @keywords utilities
+#' @export padTestPlot
+padTestPlot <- function(y,padlength,dt=1,...) {
+
+fy <- fft(y-mean(y))
+df = 1/dt
+f <- ((1:length(y))-1)/length(y)*df
+
+padfy <- fft(c(y-mean(y),rep(0,padlength)))
+paddf = 1/(length(y)+padlength)/dt
+padf <- ((1:length(padfy))-1)*paddf
+
+par(mfcol=c(2,1))
+plot(f,Mod(fy)/length(y),xlim=c(0,5),type="b",main="fft",...)
+plot(padf,Mod(padfy)/length(y),xlim=c(0,5),type="b",main=paste("padded fft,n=",padlength),...)
+
+}
+
+
+
+
+#' Plot amplitude or argument of Fourier transform of a time series
+#' 
+#' Plot amplitude or argument of Fourier transform of a time series
+#' 
+#' 
+#' @param x Time series
+#' @param dt Time time interval, used to calculate frequencies
+#' @param units Time unit, default = "days"
+#' @param xlab x-label of plot
+#' @param ylab y-label of plot
+#' @param detrend If TRUE, series is detrended first. Default=FALSE
+#' @param add If TRUE, plot is added to existing plot
+#' @param argument If TRUE, plot the argument in stead of the modulus
+#' @param ... Arguments passed to plot()
+#' @return A plot of the amplitude of the Fourier transform, calculated with
+#' fft(). No zero-padding or tapering is performed.
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @keywords utilities
+#' @export plotF
+plotF <- function(x, 					#Time series 
+			dt = 1,				#Sampling time interval, used to calculated frequencies
+			units = "days",
+			xlab="f [cycles per day]",
+			ylab="|F(x)|",			#
+			detrend=FALSE,			#
+			add = FALSE,
+			argument = FALSE,	 	# If TRUE, plot the argument in stead of the modulus
+			...)				# Arguments passed to plot
+
+{
+# Plots the Fourier transform with meaningfull frequencies
+
+if (detrend==TRUE){
+N <- length(x)
+index <- 1:N
+x <- x - predict(lm(x~index))						#Detrend series		
+}
+
+if (ylab=="|F(x)|"&argument){
+ylab <- "Arg(F(x))"
+}
+
+Fx <- fft(x)
+df = 1/dt
+f <- ((1:length(x))-1)/length(x)*df
+if (add==FALSE){
+if (!argument){
+plot(f,Mod(Fx)/length(x),xlab=xlab,ylab=ylab,...)
+} else{
+plot(f,Arg(Fx),xlab=xlab,ylab=ylab,...)
+points(f,Arg(Fx)+2*pi,xlab=xlab,ylab=ylab,...)
+points(f,Arg(Fx)-2*pi,xlab=xlab,ylab=ylab,...)
+}
+} else {
+if (!argument){
+lines(f,Mod(Fx)/length(x),...)
+} else {
+lines(f,Arg(Fx),...)
+points(f,Arg(Fx)+2*pi,xlab=xlab,ylab=ylab,...)
+points(f,Arg(Fx)-2*pi,xlab=xlab,ylab=ylab,...)
+}
+}
+return(invisible(data.frame(w=f,F=Fx/length(x))))
+}
+
+
+
+#' Frequency response of moving average filter
+#' 
+#' Frequency response of moving average filter
+#' 
+#' 
+#' @param w The frequency
+#' @param L Length of the moving average filter
+#' @return Hw(w,L) = 1/L*(1-exp(-1i*L*w))/(1-exp(-1i*w))
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @keywords utilities
+#' @export Hw
+Hw <- function(w,L){
+1/L*(1-exp(-1i*L*w))/(1-exp(-1i*w))
+}

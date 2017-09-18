@@ -1,0 +1,10 @@
+Package: GPPFourier
+Version: 2.1
+Title: Calculate Gross Primary Production (GPP) from O2 Time Series
+Author: Tom Cox <tom.cox@uantwerp.be>
+Maintainer: Tom Cox <tom.cox@uantwerp.be>
+Description: Implementation of the Fourier method to estimate aquatic gross primary production from high frequency oxygen data, described in Cox, et al (2015) [DOI: 10.1002/lom3.10046] and Cox, et al (2017) [doi:10.5194/bg-2017-81].  
+License: GPL
+LazyData: yes
+Imports: Tides, mFilter
+RoxygenNote: 6.0.1

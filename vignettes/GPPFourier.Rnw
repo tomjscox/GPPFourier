@@ -1,0 +1,419 @@
+%\VignetteIndexEntry{GPPFourier}
+
+\documentclass[10pt,a4wide]{article}
+\usepackage{graphicx}
+\usepackage{lscape}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{natbib}
+\usepackage{Rd}
+
+\newcommand{\Ox}{\mathrm{O_2}}
+
+\author{Tom J.S. Cox}
+\title{GPPFourier - An R package implementing the Fourier method to estimate Gross Primary Production from high frequency O2 data.}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+\SweaveOpts{engine=R,eps=FALSE,png=TRUE,keep.source=T}
+<<echo=FALSE, include=FALSE>>=
+require(GPPFourier)
+@
+\maketitle
+\section{Introduction}
+
+This package implements the Fourier method to estimate Gross Primary Production (GPP) from high frequency O2 data. This method estimates time averaged GPP as
+
+\begin{eqnarray}
+\overline{GPP(t)} \approx && 2 \omega_1 \frac{\sin \theta - \theta
+\cos \theta}{\theta - \frac{1}{2}\sin 2\theta} A_{\Ox} \label{eq:final2}
+\end{eqnarray}
+
+where $A_{\Ox}$ represents the Fourier amplitude at the diurnal frequency of the oxygen time series; $\theta = \pi \mathrm{f_{DL}}$, with $\mathrm{f_{DL}}$ the relative fraction of daylight hours over a 24h period. $\omega_1$ denotes the diurnal frequency. For more details on the assumptions and performance of the method we refer to \citep{Cox2015b}. 
+
+
+When GPP varies slowly with time, so will $A_{O_2}$. In that case we can use a mathematical procudure called called \emph{complex demodulation} \citep{Bloomfield2000} to extract the slowly varying amplitude of a signal. Applied to the above relation between $A_{\Ox}$ and $GPP$ we have \citep{Cox2017}
+\begin{eqnarray}
+GPP'(t) \approx && 4\pi |y'(t)| \frac{\sin \theta - \theta \cos \theta}{\theta - \frac{1}{2}\sin 2\theta} \label{eq:centralresult} \\ 
+\hbox{with} && y(t) = O_2(t) \exp 2\pi i t\nonumber
+\end{eqnarray}
+This relation allows to estimate slowly varying GPP based on high frequency $\mathrm{O_2}$ time series. For more details we refer to \citet{Cox2017}.
+
+
+The two core functions implementing the Fourier method are \texttt{GPPFourier()} implementing (\ref{eq:final2}) and \texttt{GPPFourier\_t()} implementing (\ref{eq:centralresult}). Additionally, 2 higher level functions are provided to apply (\ref{eq:final2}) to a long data series in consecutive blocks of pre-defined length (\texttt{WindowGPPFourier()}) and to time series of $O_2$ with gaps (\texttt{WindowGPPFourier.gts()}). In all cases $O_2$ time series are first preconditioned with \texttt{GPPFourierPreprocess()}. This function allows for detrending and low pass filtering (simple moving average) the time series, and it confines the data set to an integer number of days (it is called from within \texttt{GPPFourier()} and \texttt{GPPFourier\_t()}).
+
+A crucial parameter in Fourier methods to estimate GPP is the relative daylength (ratio of light hours over 24h). The function \texttt{fDLfun())} implements an algorithm from the Astronomical Almanac to calculate daylength based on a Date, for a given Longitude and Lattitude. \texttt{fDLfun()} is automatically invoked by \texttt{GPPFourier()} and \texttt{GPPFourier\_t} when time is in the first column of the data frame $x$. Alternatively, the user can manually provide fDL. 
+
+It is crucial that $O2$ time series are provided with a constant sampling interval. The \texttt{GPPFourier}-package contains functions for resampling and gapfilling time series with non-constant sampling intervals (\texttt{gapfill()} and \texttt{resample()}). 
+
+Four example time series are provided
+\begin{itemize}
+\item \texttt{Kruibeke}: A time series observed in 2010 in the Scheldt estuary (Kruibeke pontoon, N51.176 E4.326), used in \citet{Cox2015b}
+\item \texttt{Hoernum}: A time series observed in 2008 at Hoernum Tief in the German Wadden Sea (Hoernum Tief pole, N54.783 E8.45), used in \citet{Cox2017} 
+\item \texttt{watercolumn}: A depth averaged O2 and GPP time series, simulated with a 1D vertical model of O2 dynamics (see \citet{Cox2017}) 
+\item \texttt{estuary}: O2 and GPP time series at a fixed estuarine location simulated with 1D longitudinal estuary model of O2 dynamics   (see \citet{Cox2017})
+\end{itemize}
+
+
+\section{Calculate average GPP from a single oxygen time series}
+Figure \ref{Fig1} shows a 10 day data set of oxygen observed at a fixed location in the Scheldt estuary (Kruibeke pontoon, N51.176 E4.326). The major visible oscilations are semi-diurnal due to the tides, that transport an oxygen gradient past the sensor. Nevertheless, there is a diel component in this time series, which is readily visible in a plot of the Fourier transform of the series (plotted with \texttt{plotF()}, Figure \ref{Fig1})
+
+<<label=GPPFourierFig1Code,fig=FALSE,echo=TRUE>>=
+par(mfrow=c(1,2))
+DO <- Kruibeke[Kruibeke$time>="2010-06-03"&Kruibeke$time<="2010-06-13",]
+plot(DO,ylab="O2",type="l")
+plotF(detrend(DO$O2), 
+		dt=as.numeric(difftime(DO$time[2], DO$time[1], units="days")), 
+		xlim=c(0,3), 
+		type="b")
+@
+
+\begin{figure}[t]
+\begin{center}
+<<label=GPPFourierFig1,fig=TRUE,echo=FALSE, width=12, height=6>>=
+par(mfrow=c(1,2))
+plot(DO,ylab="O2",type="l")
+plotF(detrend(DO$O2), 
+		dt=as.numeric(difftime(DO$time[2], DO$time[1], units="days")), 
+		xlim=c(0,3), 
+		type="b")
+@
+\end{center}
+\caption{Example O2 time series (left) and Fourier transform (right)} 
+\label{Fig1}
+\end{figure}
+
+The function \texttt{GPFourier()} estimates average GPP over the period of this time series from the amplitude of the peak at the diel frequency. 
+
+<<label=GPP1, echo=TRUE>>=
+dt <- difftime(DO$time[2], DO$time[1], units="days")
+GPP <- GPPFourier(DO$O2, 
+	dt=dt, 
+	Nfilt=1/as.numeric(dt, unit="days"), 
+	fDL=fDLfun(DO$time[1], phi=51.176, lambda=4.326)
+)
+GPP # volume specific primary production, i.e. mmol O2/m3/d
+@
+This results in the volume specific gross primary production, with units given by the unit of the O2 concentration in the time series ($\mu$M) and the time unit of \texttt{dt} (days). Thus the GPP estimate from this $\Ox$ time series is \Sexpr{round(GPP, digits=1)} mmol $\Ox$$m^{-3}d^{-1}$. The Fourier method assumes that the $\Ox$ time series represent the depth averaged $\Ox$ concentration, either because the system is considered vertically well mixed, or because the depth averaged concentrations is determined is explicitely observed, e.g. with multiple sensors. Thus, the surface specific productivity is obtained by simply multiplying by the depth of the system. The example data set is recorded at Kruibeke pontoon in the Scheldt estuary where the water depth is approximately 9.3m. Thus the surface specific productivity is estimated as \Sexpr{round(GPP*9.3, digits=1)} mmol $\Ox$$m^{-2}d^{-1}$.
+
+\section{Calculate average GPP in consecutive windows, on $O2$ time series with gaps}
+Often, $\Ox$ sensor data consists of multiple consecutive series, each of them sampled at regular time intervals, interrupted by periods where there is no data available (due to sensor failure, maintenance,...). As an example, figure \ref{Fig2} presents the $\Ox$ data recorded in 2010 at a fixed location in the Scheldt estuary (Kruibeke pontoon, N51.176 E4.326). 
+
+The function \texttt{WindowGPPFourier.gts()} analyses such interrupted $\Ox$ series with a single function call. It will split the time series at gaps that are larger that a specified number of data points (\texttt{gapMaxN}). On each individual series, GPP is caculated in consecutive time windows of prescribed length (\texttt{Width}). Missing values or gaps smaller than \texttt{gapMaxN} are automatically filled by linear interpolation. The result is shown in the bottom panel of figure \ref{Fig2}.
+
+<<label=GPPFourierFig2_code,fig=FALSE,echo=TRUE>>=
+par(mfrow=c(2,1))
+plot(Kruibeke, 
+      pch=20,
+      xlim=as.POSIXct(c("2010-01-01", "2010-12-31")))
+GPPAll_4 <- WindowGPPFourier.gts(Kruibeke, 
+                                  gapMaxN = 10, 
+                                  Width = 10, 
+                                  filtWidth=1*24, 
+                                  phi=51.176,
+                                  lambda=4.326, 
+                                  Detrend=TRUE, 
+                                  filter=TRUE, 
+                                  filtcorrect=FALSE)
+plot(GPPAll_4$time,
+      GPPAll_4$GPP*9.3/1.3, 
+      col="black", 
+      pch=19, 
+      type="b",
+      xlab="time", 
+      ylab="GPP", 
+      xlim=as.POSIXct(c("2010-01-01", "2010-12-31")))
+
+@
+
+\begin{figure}[h]
+\begin{center}
+<<label=GPPFourierFig2,fig=TRUE,echo=FALSE, width=12, height=12>>=
+par(mfrow=c(2,1), cex=2)
+plot(Kruibeke, pch=20,xlim=as.POSIXct(c("2010-01-01", "2010-12-31")))
+GPPAll_4 <- WindowGPPFourier.gts(Kruibeke, gapMaxN = 10, Width = 10, filtWidth=1*24, phi=51.176,lambda=4.326, Detrend=TRUE, filter=TRUE, filtcorrect=FALSE)
+plot(GPPAll_4$time,GPPAll_4$GPP*9.3, 
+                col="black", 
+                pch=19, 
+                type="b", 
+                xlab="time", 
+                ylab="GPP", 
+                xlim=as.POSIXct(c("2010-01-01", "2010-12-31")))
+
+@
+
+\end{center}
+\caption{Calculate average GPP on $O_2$ series with gaps} 
+\label{Fig2}
+\end{figure}
+
+\section{Estimate time varying GPP by complex demodulation}
+
+\subsection{Simulated water column}
+When long uninterrupted time series of $O_2$ are available, complex demodulation can be used to calculate time varying GPP with \texttt{GPPFourier\_t()}. As demonstrated by the application to a simulated water column $O_2$ time series, the time varying estimate closely tracks the true GPP (Figure \ref{Fig4}). 
+
+<<label=GPPFourierFig4_code,fig=FALSE,echo=TRUE>>=
+
+# Calculate GPP(t) by complex demodulation of simulated water column time series
+ 
+dt <- as.numeric(difftime(watercolumn$time[2], watercolumn$time[1] , units="days"))
+Nfilt <- 1/dt
+GPPt <- GPPFourier_t(watercolumn[,c("time", "O2")], 
+                     dt=dt, units="days", 
+                    Detrend=TRUE, 
+                    filter=TRUE, 
+                    Nfilt=Nfilt,
+                    NLowPass=Nfilt, 
+                    fDL=NULL, 
+                    circular=FALSE, 
+                    sides=2, 
+                    nf=2)
+
+par(mfrow=c(2,1), cex=1.2)
+plot(watercolumn[,c("time", "O2")], 
+     type="l", 
+     xlab="", 
+     ylab=expression(paste(O[2], " [", mu, "M]")))
+title(main="Water column")
+plot(GPPt, type="l", lwd=3, ylim=c(0,30), xlab="", ylab="GPP")
+lines(watercolumn[,c("time","GPP")], col="red")
+legend("topleft", 
+       lty=1, 
+       col=c("red", "black"), 
+       legend=c( "Simulated GPP", 
+                 expression(paste("Complex demodulated ", O[2], " series"))), 
+       bty="n")
+@
+
+
+\begin{figure}[h]
+\begin{center}
+
+<<label=GPPFourierFig4,fig=TRUE,echo=FALSE, width=6, height=10>>=
+
+# Calculate GPP(t) by complex demodulation of simulated water column time series
+ 
+dt <- as.numeric(difftime(watercolumn$time[2], watercolumn$time[1] , units="days"))
+Nfilt <- 1/dt
+GPPt <- GPPFourier_t(watercolumn[,c("time", "O2")], 
+                     dt=dt, 
+                     units="days", 
+                     Detrend=TRUE, 
+                     filter=TRUE, 
+                     Nfilt=Nfilt, 
+                     NLowPass=Nfilt, 
+                     fDL=NULL, 
+                     circular=FALSE, 
+                     sides=2, 
+                     nf=2)
+
+par(mfrow=c(2,1), cex=1.2)
+plot(watercolumn[,c("time", "O2")], 
+     type="l", 
+     xlab="", 
+     ylab=expression(paste(O[2], " [", mu, "M]")))
+title(main="Water column")
+plot(GPPt, type="l", lwd=3, ylim=c(0,30), xlab="", ylab="GPP")
+lines(watercolumn[,c("time","GPP")], col="red")
+legend("topleft", 
+       lty=1, 
+       col=c("red", "black"), 
+       legend=c( "Simulated GPP", expression(paste("Complex demodulated ", O[2], " series"))), 
+       bty="n")
+@
+
+\end{center}
+\caption{Time varying GPP estimated by complex demodulation of simulated water column $O_2$ time series} 
+\label{Fig4}
+\end{figure}
+
+
+\subsection{Simulated estuary}
+Tidal systems are more complicated and there can sometimes be large mismatches (Figure \ref{Fig5}). The presence of tidal harmonics with close to diel frequency (such as O1, K1, Q1) result in spurious diel $O_2$ fluctuations that can not be attributed to GPP. The magnitude of those fluctuations depend on the magnitude of those tidal harmonics in the water movement, as well as on the magnitude of horizontal $O_2$ gradients. 
+
+
+<<label=GPPFourierFig5_code,fig=FALSE,echo=TRUE>>=
+
+
+# Calculate GPP(t) by complex demodulation of simulated estuary time series
+
+dt <- as.numeric(difftime(estuary$time[2], estuary$time[1] , units="days"))
+Nfilt <- 1/dt
+GPPt <- GPPFourier_t(estuary[,c("time", "O2")], 
+                     dt=dt, 
+                     Detrend=FALSE, 
+                     filter=TRUE, 
+                     Nfilt=Nfilt, 
+                     NLowPass=Nfilt, 
+                     fDL=NULL, 
+                     circular=FALSE, 
+                     sides=2, 
+                     nf=2)
+
+par(mfrow=c(2,1), cex=1.2)
+plot(estuary[,c("time", "O2")], 
+     type="l", 
+     xlab="", 
+     ylab=expression(paste(O[2], " [", mu, "M]")))
+title(main="Estuary")
+plot(GPPt, 
+     type="l", 
+     lwd=3, 
+     xlab="", 
+     ylab="GPP", 
+     ylim=c(0,30))
+lines(estuary$time, 
+      filter(filter(estuary$GPP, rep(1/Nfilt, Nfilt)),rep(1/Nfilt, Nfilt)), 
+      type="l", 
+      lwd=3, 
+      ylim=c(0,30), 
+      xlab="", 
+      ylab="GPP", 
+      col="red")
+legend("topleft", 
+       lty=1, 
+       col=c("black", "red"), 
+       legend=c(expression(paste("Demodulated ", O[2], " series")), "GPP"), 
+       bty="n") 
+
+@
+
+
+
+\begin{figure}[h]
+\begin{center}
+
+
+<<label=GPPFourierFig5,fig=TRUE,echo=FALSE, width=6, height=10>>=
+
+
+# Calculate GPP(t) by complex demodulation ofsimulated estuary time series
+
+dt <- as.numeric(difftime(estuary$time[2], estuary$time[1] , units="days"))
+Nfilt <- 1/dt
+GPPt <- GPPFourier_t(estuary[,c("time", "O2")], 
+                     dt=dt, 
+                     Detrend=FALSE, 
+                     filter=TRUE, 
+                     Nfilt=Nfilt, 
+                     NLowPass=Nfilt, 
+                     fDL=NULL, 
+                     circular=FALSE, 
+                     sides=2, 
+                     nf=2)
+
+par(mfrow=c(2,1), cex=1.2)
+plot(estuary[,c("time", "O2")], type="l", xlab="", ylab=expression(paste(O[2], " [", mu, "M]")))
+title(main="Estuary")
+plot(GPPt, type="l", lwd=3, xlab="", ylab="GPP", ylim=c(0,30))
+lines(estuary$time, filter(filter(estuary$GPP, rep(1/Nfilt, Nfilt)),rep(1/Nfilt, Nfilt)), type="l", lwd=3, ylim=c(0,30), xlab="", ylab="GPP", col="red")
+legend("topleft", lty=1, col=c("black", "red"), legend=c(expression(paste("Demodulated ", O[2], " series")), "GPP"), bty="n") 
+
+@
+\end{center}
+\caption{Time varying GPP estimated by complex demodulation of simulated estuarine $O_2$ time series} 
+\label{Fig5}
+\end{figure}
+
+\subsection{Real world $O_2$ time series}
+However, these spurious fluctuations mostly average out to zero over a time period of 15 days (see \citet{Cox2017}). This can be achieved by setting the \texttt{NLowPass} parameter in \texttt{GPPFourier\_t()} to $15/dt$ where $dt$ is the sampling interval (Figure \ref{Fig3}). 
+
+<<label=GPPFourierFig3_code,fig=FALSE,echo=TRUE>>=
+
+ 
+# Calculate GPP(t) by complex demodulation of Hoernum Tief O2 time series
+dt <- as.numeric(diff(Hoernum$time)[1], units="days")
+Nf <- 1/dt
+phi <- 54.783
+lambda <- 8.45
+# Diurnal harmonic
+T1 <- 1
+f1 <- 1/T1
+# Tidal harmonics
+TO1 <- 25.81933871/24	# O1 period
+fO1 <- 1/TO1
+TQ1 <- 26.868350/24   # Large lunar elliptic diurnal
+fQ1 <- 1/TQ1
+
+GPPt <- GPPFourier_t(gapfill(Hoernum), 
+                     Nf=Nf, 
+                     nf=2, 
+                     NLowPass=Nf, 
+                     phi=phi, 
+                     lambda=lambda)
+
+GPPt15 <- GPPFourier_t(gapfill(Hoernum), 
+                       Nf=Nf, 
+                       nf=2, 
+                       NLowPass=15/dt, 
+                       phi=phi, 
+                       lambda=lambda)
+
+
+par(mfrow=c(2,1))
+plot(GPPt, type="l", ylab="GPP(t)")
+title(main="Hoernum Tief")
+lines(GPPt15, lwd=3)
+legend("topright", legend=c("1 Day filter", "15 Day filter"),lwd=c(1,3), bty="n") 
+plotF((GPPt$GPPt-GPPt15$GPPt)[!is.na(GPPt15$GPPt)], dt=dt, xlim=c(0,0.5), type="b", pch=20)
+abline(v=c(f1-fO1, f1-fQ1))
+title(main="Spectrum of difference")
+
+@ 
+
+
+
+\begin{figure}[h]
+\begin{center}
+
+<<label=GPPFourierFig3,fig=TRUE,echo=FALSE>>=
+
+ 
+# Calculate GPP(t) by complex demodulation of Hoernum Tief O2 time series
+dt <- as.numeric(diff(Hoernum$time)[1], units="days")
+Nf <- 1/dt
+phi <- 54.783
+lambda <- 8.45
+# Diurnal harmonic
+T1 <- 1
+f1 <- 1/T1
+# Tidal harmonics
+TO1 <- 25.81933871/24	# O1 period
+fO1 <- 1/TO1
+TQ1 <- 26.868350/24   # Large lunar elliptic diurnal
+fQ1 <- 1/TQ1
+
+GPPt <- GPPFourier_t(gapfill(Hoernum), 
+                     Nf=Nf, nf=2, 
+                     NLowPass=Nf, 
+                     phi=phi, 
+                     lambda=lambda)
+GPPt15 <- GPPFourier_t(gapfill(Hoernum), 
+                       Nf=Nf, 
+                       nf=2, 
+                       NLowPass=15/dt, 
+                       phi=phi, 
+                       lambda=lambda)
+
+par(mfrow=c(2,1))
+plot(GPPt, type="l", ylab="GPP(t)")
+title(main="Hoernum Tief")
+lines(GPPt15, lwd=3)
+legend("topright", legend=c("1 Day filter", "15 Day filter"),lwd=c(1,3), bty="n") 
+plotF((GPPt$GPPt-GPPt15$GPPt)[!is.na(GPPt15$GPPt)], dt=dt, xlim=c(0,0.5), type="b", pch=20)
+abline(v=c(f1-fO1, f1-fQ1))
+title(main="Spectrum of difference")
+
+@ 
+\end{center}
+\caption{Complex demodulated time series of Hoernum Tief in 2008} 
+\label{Fig3}
+\end{figure}
+
+
+
+\bibliography{GPPFourier}
+\bibliographystyle{apalike2}
+
+\end{document}

@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2015/Debian)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: GPPFourier.aux
+The style file: apalike2.bst
+Database file #1: GPPFourier.bib
+You've used 1 entry,
+            2229 wiz_defined-function locations,
+            518 strings with 4209 characters,
+and the built_in function-call counts, 493 in all, are:
+= -- 44
+> -- 28
+< -- 0
++ -- 10
+- -- 10
+* -- 45
+:= -- 92
+add.period$ -- 3
+call.type$ -- 1
+change.case$ -- 10
+chr.to.int$ -- 1
+cite$ -- 1
+duplicate$ -- 14
+empty$ -- 30
+format.name$ -- 11
+if$ -- 92
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 1
+newline$ -- 8
+num.names$ -- 3
+pop$ -- 8
+preamble$ -- 1
+purify$ -- 10
+quote$ -- 0
+skip$ -- 11
+stack$ -- 0
+substring$ -- 33
+swap$ -- 1
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 6
+warning$ -- 0
+while$ -- 3
+width$ -- 0
+write$ -- 15

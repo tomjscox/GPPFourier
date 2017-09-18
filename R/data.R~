@@ -1,0 +1,14 @@
+
+#
+# 2016-09-13 This file was added in the R-directory with only purpose of generating Rd files with roxygen2 
+#
+
+#' Example O2 time series. Observed in June 2010 (2010-06-04 to 2010-06-16) in the Scheldt estuary (Kruibeke pontoon)       
+#' @name DO
+#' @aliases DO
+#' @docType data
+#' @format A data frame containing observation time, the observed dissolved oxygen concentration in \if{latex}{\out{$\mu$}} \if{html}{\out{&mu;}} M
+#' @references Cox T.J.S. et al. (2015) 'Estimating primary production from oxygen time series: a novel approach in the frequency domain', Limnology And Oceanography:Methods 13, 529-552. DOI: 10.1002/lom3.10046
+#' @keywords datasets
+NULL
+

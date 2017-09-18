@@ -1,0 +1,224 @@
+#
+# Core functions to calculate GPP from O2 time series making use of Fourier method
+#
+
+
+
+#' Pre-process O2 data for GPP calculation
+#' 
+#' Removes longer term trend of time series and confine series to integer
+#' number of days
+#' 
+#' 
+#' @param x A vector containing consecutive O2 concentrations, sampled at regular intervals (time step = dt).
+#' @param dt Sampling time step
+#' @param units Units of sampling time step
+#' @param Detrend Toggle time series detrending
+#' @param filter Toggle time series filtering
+#' @param Nfilt Moving average filter width (see documentation of
+#' \code{filter()})
+#' @param circular Moving average boundary condition (see documentation of
+#' \code{filter()})
+#' @param sides Moving average central or one sided (see documentation of
+#' \code{filter()})
+#' @details GPPFourierPreprocess() is called by GPPFourier() to pre-process the time series before calculating the Fourier amplitude at diel frequency and estimate GPP. 
+#' @return A list with components \item{filt}{The long term trend}
+#' \item{res}{The original series without the long term trend, confined to an
+#' integer number of days} \item{indices}{The indices of the subset of the
+#' series that are retained, after filtering and confining to an integer number
+#' of days.}
+#' @seealso \code{\link{GPPFourier}}, \code{\link{WindowGPPFourier}},
+#' \code{\link{WindowGPPFourier.gts}}
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @references Cox T.J.S. et al. (2015) 'Estimating primary production from oxygen time series: a novel approach in the frequency domain', Limnology And Oceanography:Methods 13, 529-552. DOI: 10.1002/lom3.10046
+
+#' @keywords utilities
+#' @export GPPFourierPreprocess
+GPPFourierPreprocess <- function(x,		# O2 time series from which GPP is to be calculated
+			dt=NULL,		# Sampling time step
+			units=c("days", "hours", "mins"),		# Time units of sampling time step
+			Detrend=TRUE,		# Toggle time series detrending
+			filter = TRUE, 		# Toggle time series filtering
+			Nfilt=NULL,		# Moving average filter width (see documentation of filter())
+			circular = FALSE, 	# Moving average boundary condition (see documentation of filter())
+			sides = 2)		# Moving average central or one sided (see documentation of filter()) 
+
+
+{
+
+# Removes longer term trends and confines time series to integer number of periods 
+# 
+#
+
+unit <- match.arg(units)
+
+if (is.null(dt)) stop("Provide dt")
+if (!inherits(dt,"difftime")){
+if (is.null(units)) {
+  stop("Either provide dt as difftime object, or provide units of dt")
+} else {
+  dt <- as.difftime(dt, units=unit)
+}}
+
+if (filter&is.null(Nfilt)) stop("Provide filter length (Nfilt)")
+if (Nfilt>length(x)) stop("Filter longer than time series")
+
+
+dt <- as.double(dt, units="days")
+
+# confine series to integer number of periods (T=1 day = 1/dt samples)
+
+Nperiod <- floor(length(x)*dt)/dt
+indices <- 1:Nperiod
+x <- x[indices] 
+
+if (Detrend){
+detrendx <- detrend(x, returntrend=TRUE)
+x <- detrendx$detrended
+trendx <- detrendx$trend
+} else {
+trendx <- rep(mean(x), length(x))
+}
+
+if (filter){
+
+cfilt <- rep(1/Nfilt,Nfilt)
+
+filtx <- filter(x,cfilt,sides=sides,circular=circular)
+resx <- x - filtx
+indices <- indices[!is.na(filtx)]
+
+} else {
+  filtx <- rep(mean(x),length(x))
+  resx <- x - mean(x)
+}
+
+# confine filtered series to integer number of periods (T=1 day = 1/dt samples)
+filtx <- filtx[!is.na(filtx)] 
+resx <- resx[!is.na(resx)]
+
+Nperiod <- floor(length(filtx)*dt)/dt
+indices <- indices[1:Nperiod]
+filtx <- filtx[1:Nperiod] 
+resx <- resx[1:Nperiod]
+
+return(list(filt = filtx, res=resx, trend=trendx, indices=indices))
+}
+
+
+
+
+
+#' Calculate GPP from O2 time series
+#' 
+#' This is the workhorse to calculate aquatic Gross Primary Production from
+#' high frequency dissolved oxygen data. It will often be more convenient to use the higher
+#' level functions \code{\link{WindowGPPFourier}} and
+#' \code{\link{WindowGPPFourier.gts}}
+#' 
+#' GPP is calculated from the O2 time series with the Fourier method (see reference) \code{x} must be a vector
+#' O2 concentrations at regular time interval, given by \code{dt}.
+#' 
+#' @param x A vector containing consecutive O2 concentrations, sampled at regular intervals (time step = dt).
+#' @param dt Sampling time step. Either a difftime object or a numerical value.
+#' When \code{dt} is given as a numerical value, the unit is assumed to be
+#' days, unless \code{units} is provided.
+#' @param units Unit of sampling time step
+#' @param Nfilt Moving average filter width
+#' @param fDL Relative fraction of light hours during the day
+#' @param filter Logical controlling whether time series is
+#' high-pass filtered. See \code{\link{GPPFourierPreprocess}}
+#' @param Detrend Logical controlling whether time series is
+#' detrended. See \code{\link{GPPFourierPreprocess}}
+#' @param filtcorrect Logical controlling whether GPP estimate
+#' is corrected for signal falsely removed by filtering
+#' @param ... Other parameters to be passed to \code{\link{GPPFourierPreprocess}}
+#' @return Volume specific average gross primary production in units of oxgen as in \code{x}. 
+#' per time unit (unit of \code{dt}, given by \code{units}). 
+#' Specifically: if O2 concentrations are in mg/L, and \code{units = days}, calculated GPP has units mg/L/day.
+#' If surface specific primary production (e.g. per m2) is desired, this number has to be multiplied by the depth of the water body.
+#' @author Tom Cox <tom.cox@uantwerp.be>
+#' @seealso \code{\link{GPPFourierPreprocess}}, \code{\link{WindowGPPFourier}},
+#' \code{\link{WindowGPPFourier.gts}}
+#' @references Cox T.J.S. et al. (2015) 'Estimating primary production from oxygen time series: a novel approach in the frequency domain', Limnology And Oceanography:Methods 13, 529-552. DOI: 10.1002/lom3.10046
+#'
+#' @keywords utilities
+#' @examples
+#' 
+#' 
+#' dt <- as.numeric(difftime(DO$time[2],DO$time[1],units="days"))
+#' DL <- fDL(DO$time[1], phi=51.176, lambda=4.326) 
+#' GPP <- GPPFourier(DO$O2,dt=dt,Nfilt=100,fDL=DL)
+#' 
+#' 
+#' @export GPPFourier
+GPPFourier <- function(	x,			# O2 time series from which GPP is to be calculated
+			dt=NULL,		# Sampling time step
+			units=c("days","hours","mins"),		# Time units of sampling time step
+			Nfilt=NULL,		# Moving average filter width
+			fDL=NULL,		# Relative fraction of light hours during the day
+			filter = FALSE,		# Logical controlling whether time series is high-pass filtered. See GPPFourierPreprocess
+			Detrend = FALSE,	# Logical controlling whether time series is detrended. See GPPFourierPreprocess
+			filtcorrect = FALSE,	# Logical controlling whether GP estimate is corrected for signal removed by moving average filtering 
+			...)			# Other parameters to be passed to GPPFourierprocess
+{
+# Calculate average gross production from O2 time series
+# Units: unit of oxgen as in ts per days
+#
+
+#
+# Error handling
+# 
+
+if (is.null(dt)) stop("Provide dt")
+
+unit <- match.arg(units)
+if (!inherits(dt,"difftime")){
+if (is.null(units)) {
+  stop("Either provide dt as difftime object, or provide units of dt")
+} else {
+  dt <- as.difftime(dt, units=unit)
+}}
+
+if (is.null(Nfilt)) stop("Provide moving average filter width (Nfilt)")
+if (is.null(fDL)) stop("Provide daylight fraction of day (fDL)")
+if (Nfilt>length(x)) stop("Filter longer than time series")
+
+
+# angular frequency (rad per day) associated with diurnal periodicity, i.e. T = 1 day
+w <- 2*pi/1
+
+# Remove longer term trends and confines time series to integer number of periods 
+xpreprocessed <- GPPFourierPreprocess(x, dt=dt, Nfilt=Nfilt, filter=filter, Detrend=Detrend, ...)
+
+filtx <- xpreprocessed$filt
+resx <- xpreprocessed$res
+indices <- xpreprocessed$indices
+
+dt <- as.double(dt,units="days")		
+# direct calculation of A24
+times <- (1:length(resx))*dt
+A24 <- 2*sum(exp(-times*1i*w)*resx)/length(resx)
+
+# correction for truncated sinusoidal form of GPP
+theta1 <- pi*(1-fDL)
+truncFac <- (sin(theta1) + (pi-theta1) * cos(theta1))/(pi-theta1 + 0.5 * sin(2*theta1))
+A24 <- A24*truncFac
+
+# Calculate time derivative in frequency domain
+A24 <- 1i*w*A24
+
+# Correct for frequency response of moving average filter
+if (filtcorrect){
+if (is.null(Nfilt)){
+warning("Nfilt=NULL. No filter correction calculated")
+} else { 
+L <- Nfilt
+maxfreq <- (length(resx) - 1)/(length(resx))/dt
+w24h <- 2*pi/maxfreq
+A24 <- A24/(1-Hw(w24h,Nfilt))
+}}
+
+return(Mod(A24))
+}
+

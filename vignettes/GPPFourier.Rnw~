@@ -1,0 +1,93 @@
+%\VignetteIndexEntry{GPPFourier}
+
+\documentclass[10pt,a4wide]{article}
+\usepackage{graphicx}
+\usepackage{lscape}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{natbib}
+\usepackage{Rd}
+
+\newcommand{\Ox}{\mathrm{O_2}}
+
+\author{Tom Cox}
+\title{The Fourier method to estimate Gross Primary Production from high frequency O2 data.}
+
+\begin{document}
+
+\SweaveOpts{engine=R,eps=FALSE,png=TRUE,keep.source=T}
+<<echo=FALSE, include=FALSE>>=
+require(GPPFourier)
+@
+\maketitle
+\section{Introduction}
+
+This package implements the Fourier method to estimate Gross Primary Production (GPP) from high frequency O2 data. In particular, time averaged GPP is estimated as
+
+\begin{eqnarray}
+\overline{GPP(t)} \approx && 2 \omega_1 \frac{\sin \theta - \theta
+\cos \theta}{\theta - \frac{1}{2}\sin 2\theta} A_{\Ox} \label{eq:final2}
+\end{eqnarray}
+
+where $A_{\Ox}$ represents the Fourier amplitude at the diurnal frequency of the oxygen time series; $\theta = \pi \mathrm{f_{DL}}$, with $\mathrm{f_{DL}}$ the relative fraction of daylight hours over a 24h period. $\omega_1$ denotes the diurnal frequency. For more details on the assumptions and performance of the method we refer to \citep{Cox2015b}.
+
+The two core functions implementing the Fourier method are \texttt{GPPFourierPreprocess()} and \texttt{GPPFourier()}.\texttt{GPPFourier()} is the workhorse function of the package. It calculates \ref{eq:final2} for a single time series of O2, regularly sampled at a fixed sampling rate. Before computing the Fourier amplitude at diel frequency, the time series is preconditioned by making use of  \texttt{GPPFourierPreprocess()}. This function allows for detrending and low pass filtering (simple moving average) the time series, and it confines the data set to an integer number of days. 
+
+Apart from the core functions, 2 higher level functions are provided to process a long data series in consecutive blocks of pre-defined length (\texttt{WindowGPPFourier()}) and to analyse multiple consecutive time series with a time gap in between, pasted together in a single data frame (\texttt{WindowGPPFourier.gts()}).
+
+\section{Calculate GPP on a single oxygen time series}
+Figure \ref{Fig1} shows a 10 day data set of oxygen observed at a fixed location in the Scheldt estuary (Kruibeke pontoon, N51.176 E4.326). The major visible oscilations are semi-diurnal due to the tides, that transport an oxygen gradient past the sensor. Nevertheless, there is a diel component in this time series, which is readily visible in a plot of the Fourier transform of the series
+
+\begin{figure}[t]
+\begin{center}
+<<label=GPPFourierFig1,fig=TRUE,echo=TRUE, width=12, height=6>>=
+par(mfrow=c(1,2))
+plot(DO,ylab="O2",type="l")
+plotF(detrend(DO$O2), 
+		dt=as.numeric(difftime(DO$time[2], DO$time[1], units="days")), 
+		xlim=c(0,3), 
+		type="b")
+@
+\end{center}
+\caption{Example O2 time series (left) and Fourier transform (right)} 
+\label{Fig1}
+\end{figure}
+
+Average GPP over the period of this time series is estimated as
+
+<<label=GPP1, echo=TRUE>>=
+dt <- difftime(DO$time[2], DO$time[1], units="days")
+GPPFourier(DO$O2, 
+	dt=dt, 
+	Nfilt=1/as.numeric(dt, unit="days"), 
+	fDL=fDL(DO$time[1], phi=51.176, lambda=4.326)
+	) # volume specific primary production, i.e. mu Mol O2/m3/d
+@
+
+
+
+
+\section{Analysing multiple consecutive series at once}
+
+
+\begin{figure}[h]
+\begin{center}
+<<label=GPPFourierFig2,fig=TRUE,echo=FALSE, width=12, height=12>>=
+par(mfrow=c(2,1))
+plot(O2_2010)
+GPPAll_4 <- WindowGPPFourier.gts(O2_2010, gapMaxN = 10, Width = 10, filtWidth=1*24, phi=51.176,lambda=4.326, Detrend=TRUE, filter=TRUE, filtcorrect=FALSE)
+plot(GPPAll_4$time,GPPAll_4$GPP*9.3/1.3, col="black", pch=19, type="b")
+
+@
+
+\end{center}
+\caption{Calculating GPP on multiple series at once} 
+\label{Fig2}
+\end{figure}
+
+
+
+\bibliography{GPPFourier}
+\bibliographystyle{apalike2}
+
+\end{document}

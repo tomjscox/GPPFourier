@@ -1,0 +1,12 @@
+Package: GPPFourier
+Version: 1.0
+Title: GPPFourier
+Author: Tom Cox <tom.cox@uantwerp.be>
+Maintainer: Tom Cox <tom.cox@uantwerp.be>
+Description: Calculate aquatic gross primary production from high
+    frequency oxygen data. 
+License: GPL
+LazyData: yes
+RoxygenNote: 5.0.1
+Suggests: knitr, rmarkdown
+
