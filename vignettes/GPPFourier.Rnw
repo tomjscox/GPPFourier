@@ -230,6 +230,7 @@ legend("topleft",
 
 
 \subsection{Simulated estuary}
+\label{sec:estuary}
 Tidal systems are more complicated and there can sometimes be large mismatches (Figure \ref{Fig5}). The presence of tidal harmonics with close to diel frequency (such as O1, K1, Q1) result in spurious diel $O_2$ fluctuations that can not be attributed to GPP. The magnitude of those fluctuations depend on the magnitude of those tidal harmonics in the water movement, as well as on the magnitude of horizontal $O_2$ gradients. 
 
 
@@ -317,7 +318,7 @@ legend("topleft", lty=1, col=c("black", "red"), legend=c(expression(paste("Demod
 \end{figure}
 
 \subsection{Real world $O_2$ time series}
-However, these spurious fluctuations mostly average out to zero over a time period of 15 days (see \citet{Cox2017}). This can be achieved by setting the \texttt{NLowPass} parameter in \texttt{GPPFourier\_t()} to $15/dt$ where $dt$ is the sampling interval (Figure \ref{Fig3}). 
+However, the spurious fluctuations in estuaries (see \ref{sec:estuary}) mostly average out to zero over a time period of 15 days (see \citet{Cox2017}). This can be achieved by setting the \texttt{NLowPass} parameter in \texttt{GPPFourier\_t()} to $15/dt$ where $dt$ is the sampling interval (Figure \ref{Fig3}). 
 
 <<label=GPPFourierFig3_code,fig=FALSE,echo=TRUE>>=
 
