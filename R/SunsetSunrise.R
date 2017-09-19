@@ -11,7 +11,7 @@
 #' @author Tom Cox <tom.cox@uantwerp.be>
 
 fDLfun <- function(date="2016-07-01", phi=51.176, lambda=4.326, H=0) {
-date <- round(as.POSIXct(date), units="days")
+date <- round.POSIXt(as.POSIXct(date), units="days")
 if (length(date)<2){
   DL <- diff(SunRiseSet(date,phi=phi,lambda=lambda))
 } else {

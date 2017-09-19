@@ -168,7 +168,7 @@ if (inherits(ts,"data.frame")){
   if (dim(ts)[2]>=2){
     t <- ts[,1]
     if (inherits(t, "POSIXt")){ 
-      if (any(0!=diff(diff(round(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
+      if (any(0!=diff(diff(round.POSIXt(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
       dt <- difftime(t[2],t[1],units="days")        
     } else {
       if (any(0!=round(diff(diff(t)), digits=5))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")      
@@ -413,7 +413,7 @@ WindowGPPFourier <- function(x,
     if (any(is.na(ts[,c(1,2)]))) stop("NAs not allowed")
     if (dim(ts)[2]>=2){
       t <- ts[,1]
-      if (any(0!=diff(diff(round(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
+      if (any(0!=diff(diff(round.POSIXt(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
       dt <- difftime(t[2],t[1],units="days")
       O2 <- ts[,2]
       if (is.null(fDL)){
@@ -666,7 +666,7 @@ GPPFourier_t <- function(	x,
     if (dim(ts)[2]>=2){
       t <- ts[,1]
       if (inherits(t, "POSIXt")){ 
-        if (any(0!=diff(diff(round(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
+        if (any(0!=diff(diff(round.POSIXt(t, units="secs"))))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")    
         dt <- difftime(t[2],t[1],units="days")        
       } else {
         if (any(0!=round(diff(diff(t)), digits=5))) stop("Samples are not equidistant and/or gaps are present in the series. Re-sample, fill gaps and/or split series in continuous subsets")      
