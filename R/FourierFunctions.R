@@ -83,8 +83,8 @@ plot(padf,Mod(padfy)/length(y),xlim=c(0,5),type="b",main=paste("padded fft,n=",p
 #' @param x Time series
 #' @param dt Time time interval, used to calculate frequencies
 #' @param units Time unit, default = "days"
-#' @param xlab x-label of plot
-#' @param ylab y-label of plot
+#' @param xlab x-label of plot. Default: f [d-1]" "f [cycles per day]"
+#' @param ylab y-label of plot. Default: |F(x)|, or Arg(F(x)) when argument=TRUE
 #' @param detrend If TRUE, series is detrended first. Default=FALSE
 #' @param add If TRUE, plot is added to existing plot
 #' @param argument If TRUE, plot the argument in stead of the modulus
@@ -99,8 +99,8 @@ plot(padf,Mod(padfy)/length(y),xlim=c(0,5),type="b",main=paste("padded fft,n=",p
 plotF <- function(x, 					#Time series 
 			dt = 1,				#Sampling time interval, used to calculated frequencies
 			units = "days",
-			xlab="f [cycles per day]",
-			ylab="|F(x)|",			#
+			xlab=NULL,
+			ylab=NULL,			# "|F(x)|"
 			detrend=FALSE,			#
 			add = FALSE,
 			argument = FALSE,	 	# If TRUE, plot the argument in stead of the modulus
@@ -115,8 +115,19 @@ index <- 1:N
 x <- x - predict(lm(x~index))						#Detrend series		
 }
 
-if (ylab=="|F(x)|"&argument){
-ylab <- "Arg(F(x))"
+if (is.null(ylab)){
+if (argument){
+  ylab <- "Arg(F(x))"
+} else {
+  ylab <- "|F(x)|"
+}
+}
+  
+if (is.null(xlab)){
+  xlab <- switch(units,
+         "days"=expression(paste("f [d"^-1,"]")),
+         "mins"=expression(paste("f [min"^-1,"]")),
+         "secs"=expression(paste("f [s"^-1,"]")))
 }
 
 Fx <- fft(x)
