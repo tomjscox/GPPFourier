@@ -5,6 +5,7 @@
 #' @param H Height of location where fDL is to be calculated
 #' @param method Method for daylength calculation. "insol" (default) makes use of the function \code{daylength()} from the package \code{insol}; "almanac" makes use of \code{\link{SunRiseSet}} implementing the algorithm from the Astronomical Almanac
 #' @importFrom insol daylength
+#' @importFrom insol JDymd
 #'
 #' @return The fraction of daylight hours at the specified date and location. Sunrise and Sunset are calculated with \code{\link{SunRiseSet}}.
 #' @export fDLfun
