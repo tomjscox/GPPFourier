@@ -496,7 +496,7 @@ demod <- function(	x, 				# Time series to be demodulated
                    w1 = 2*pi/1, 			# Carrier frequency
                    filttype=c("MA"),		# Filter type
                    Nf, 				# Moving average filter width
-                   nf = 1,				# Number of moving averaging filter passes
+                   nf = 1				# Number of moving averaging filter passes
                    )
   
   

@@ -4,7 +4,7 @@
 \alias{demod}
 \title{Complex demodulation}
 \usage{
-demod(x, dt, w1 = 2 * pi/1, filttype = c("MA", "bw"), Nf, nf = 1, freq)
+demod(x, dt, w1 = 2 * pi/1, filttype = c("MA"), Nf, nf = 1)
 }
 \arguments{
 \item{x}{Vector containing time series observations at constant sampling interval}
@@ -13,7 +13,7 @@ demod(x, dt, w1 = 2 * pi/1, filttype = c("MA", "bw"), Nf, nf = 1, freq)
 
 \item{w1}{Carrier frequency. Inverse unit of \code{dt}.}
 
-\item{filttype}{Filter type to be applied for low pass filtering. "MA" for moving average; "bw" for butterworth filter.}
+\item{filttype}{Filter type to be applied for low pass filtering. Only "MA" (moving average) is implemented.}
 
 \item{Nf}{Moving average filter width}
 

@@ -4,8 +4,8 @@
 \alias{plotF}
 \title{Plot amplitude or argument of Fourier transform of a time series}
 \usage{
-plotF(x, dt = 1, units = "days", xlab = "f [cycles per day]",
-  ylab = "|F(x)|", detrend = FALSE, add = FALSE, argument = FALSE, ...)
+plotF(x, dt = 1, units = "days", xlab = NULL, ylab = NULL,
+  detrend = FALSE, add = FALSE, argument = FALSE, ...)
 }
 \arguments{
 \item{x}{Time series}
@@ -14,9 +14,9 @@ plotF(x, dt = 1, units = "days", xlab = "f [cycles per day]",
 
 \item{units}{Time unit, default = "days"}
 
-\item{xlab}{x-label of plot}
+\item{xlab}{x-label of plot. Default: f [d-1]" "f [cycles per day]"}
 
-\item{ylab}{y-label of plot}
+\item{ylab}{y-label of plot. Default: |F(x)|, or Arg(F(x)) when argument=TRUE}
 
 \item{detrend}{If TRUE, series is detrended first. Default=FALSE}
 

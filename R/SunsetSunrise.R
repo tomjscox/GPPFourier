@@ -3,6 +3,7 @@
 #' @param phi Latitude
 #' @param lambda Longitude
 #' @param H Height of location where fDL is to be calculated
+#' @param method Method for daylength calculation. "almanac" makes use of the \code{\link{SunRiseSet}} implementing the algorithm from the Astronomical Almanac, "insol" makes use of the function \code{daylength()} from the package \colde{insol}
 #' @importFrom insol daylength
 #'
 #' @return The fraction of daylight hours at the specified date and location. Sunrise and Sunset are calculated with \code{\link{SunRiseSet}}.
@@ -11,16 +12,32 @@
 #' @seealso \code{\link{SunRiseSet}}
 #' @author Tom Cox <tom.cox@uantwerp.be>
 
-fDLfun <- function(date="2016-07-01", phi=51.176, lambda=4.326, H=0) {
-
+fDLfun <- function(date="2016-07-01", phi=51.176, lambda=4.326, H=0, method=c("insol", "almanac")) {
+  method <- match.arg(method)
   date <- round.POSIXt(as.POSIXct(date), units="days")
+  
+  if (method=="almanac"&phi>66) stop("Algorithm from astronomical alamanac does not work for latitudes > 66. Use method insol instead")
+  
+  
 if (length(date)<2){
-  DL <- diff(SunRiseSet(date=date,phi=phi,lambda=lambda, H=H))
+  if (method == "almanac"){
+    DL <- diff(SunRiseSet(date=date,phi=phi,lambda=lambda, H=H))
+  } else {
+    dateLT <- as.POSIXlt(date)
+    DL <- suppressWarnings(daylength(lat=phi, lon=lambda, JDymd(dateLT$year+1900,dateLT$mon+1, dateLT$mday), 0)[,"daylen"])
+    if (is.nan(DL)) DL <- 24 # function daylength from insol returns NaN when daylength is 24h
+  }
 } else {
   AllDL <- NULL
   dates <- unique(date)
   for (i in 1:length(dates)) {
-    DL <- diff(SunRiseSet(date=dates[i],phi=phi,lambda=lambda, H=H))
+    if (method=="almanac"){    
+      DL <- diff(SunRiseSet(date=dates[i],phi=phi,lambda=lambda, H=H))
+    } else {
+      dateLT <- as.POSIXlt(dates[i])
+      DL <- suppressWarnings(daylength(lat=phi, lon=lambda, JDymd(dateLT$year+1900,dateLT$mon+1, dateLT$mday), 0)[,"daylen"])
+      if (is.nan(DL)) DL <- 24 # function daylength from insol returns NaN when daylength is 24h
+    }
     AllDL <- c(AllDL, DL)
     }
   DL <- AllDL[match(date, dates)]
