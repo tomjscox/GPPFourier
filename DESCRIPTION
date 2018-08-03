@@ -6,5 +6,5 @@ Maintainer: Tom Cox <tom.cox@uantwerp.be>
 Description: Implementation of the Fourier method to estimate aquatic gross primary production from high frequency oxygen data, described in Cox, et al (2015) <doi:10.1002/lom3.10046> and Cox, et al (2017) <doi:10.5194/bg-2017-81>.  
 License: GPL
 LazyData: yes
-Imports: Tides, mFilter
+Imports: Tides
 RoxygenNote: 6.0.1
