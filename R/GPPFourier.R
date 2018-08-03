@@ -484,21 +484,20 @@ WindowGPPFourier <- function(x,
 #' @param x Vector containing time series observations at constant sampling interval
 #' @param dt Time step of time series. Arbitrary units. Class \code{Numeric} or \code{difftime}
 #' @param w1 Carrier frequency. Inverse unit of \code{dt}.
-#' @param filttype Filter type to be applied for low pass filtering. "MA" for moving average; "bw" for butterworth filter.
+#' @param filttype Filter type to be applied for low pass filtering. Only "MA" (moving average) is implemented.
 #' @param Nf Moving average filter width
 #' @param nf Number of iterative applications of moving average filter. To remove filter bandwidth.
 #' @param freq Cut-off frequency of Buttersworth filter
 #' @details no details
-#' @importFrom mFilter bwfilter
 #' @export demod
 
 demod <- function(	x, 				# Time series to be demodulated
                    dt,				# Time series time step
                    w1 = 2*pi/1, 			# Carrier frequency
-                   filttype=c("MA","bw"),		# Filter type
+                   filttype=c("MA"),		# Filter type
                    Nf, 				# Moving average filter width
                    nf = 1,				# Number of moving averaging filter passes
-                   freq)				# Cut-off frequency of Buttersworth filter
+                   )
   
   
 {
@@ -525,8 +524,6 @@ demod <- function(	x, 				# Time series to be demodulated
     }
     demodfilt <- demodfiltRe + demodfiltIm*1i
   } else {
-    demodfilt <- bwfilter(xdemod,freq=freq)
-    demodfilt <- demodfilt$trend
   }
   return(2*demodfilt)
 }
