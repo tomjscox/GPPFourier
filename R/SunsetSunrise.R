@@ -3,6 +3,7 @@
 #' @param phi Latitude
 #' @param lambda Longitude
 #' @param H Height of location where fDL is to be calculated
+#' @importFrom insol daylength
 #'
 #' @return The fraction of daylight hours at the specified date and location. Sunrise and Sunset are calculated with \code{\link{SunRiseSet}}.
 #' @export fDLfun
@@ -11,14 +12,15 @@
 #' @author Tom Cox <tom.cox@uantwerp.be>
 
 fDLfun <- function(date="2016-07-01", phi=51.176, lambda=4.326, H=0) {
-date <- round.POSIXt(as.POSIXct(date), units="days")
+
+  date <- round.POSIXt(as.POSIXct(date), units="days")
 if (length(date)<2){
-  DL <- diff(SunRiseSet(date,phi=phi,lambda=lambda))
+  DL <- diff(SunRiseSet(date=date,phi=phi,lambda=lambda, H=H))
 } else {
   AllDL <- NULL
   dates <- unique(date)
   for (i in 1:length(dates)) {
-    DL <- diff(SunRiseSet(dates[i],phi=phi,lambda=lambda))
+    DL <- diff(SunRiseSet(date=dates[i],phi=phi,lambda=lambda, H=H))
     AllDL <- c(AllDL, DL)
     }
   DL <- AllDL[match(date, dates)]
