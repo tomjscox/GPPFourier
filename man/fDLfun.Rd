@@ -16,7 +16,7 @@ fDLfun(date = "2016-07-01", phi = 51.176, lambda = 4.326, H = 0,
 
 \item{H}{Height of location where fDL is to be calculated}
 
-\item{method}{Method for daylength calculation. "insol" (default) makes use of the function \code{daylength()} from the package \colde{insol}; "almanac" makes use of \code{\link{SunRiseSet}} implementing the algorithm from the Astronomical Almanac}
+\item{method}{Method for daylength calculation. "insol" (default) makes use of the function \code{daylength()} from the package \code{insol}; "almanac" makes use of \code{\link{SunRiseSet}} implementing the algorithm from the Astronomical Almanac}
 }
 \value{
 The fraction of daylight hours at the specified date and location. Sunrise and Sunset are calculated with \code{\link{SunRiseSet}}.
