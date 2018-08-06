@@ -1,0 +1,4 @@
+2018-08-06 (Tom Cox) 
+Use insol package by default for daylength computation in fLDfun()
+Remove dependency on deprecated R package mFilter
+
