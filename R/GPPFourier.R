@@ -247,6 +247,8 @@ w24h <- 2*pi/maxfreq
 A24 <- A24/(1-Hw(w24h,Nfilt))
 }}
 
+names(A24) <- "GPP"
+
 return(Mod(A24))
 }
 
