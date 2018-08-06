@@ -1,5 +1,5 @@
 Package: GPPFourier
-Version: 2.1
+Version: 2.1.1
 Title: Calculate Gross Primary Production (GPP) from O2 Time Series
 Author: Tom Cox <tom.cox@uantwerp.be>
 Maintainer: Tom Cox <tom.cox@uantwerp.be>
